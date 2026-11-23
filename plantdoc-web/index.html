@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="PlantDoc AI — periksa kondisi daun tomat dari foto langsung di browser.">
+  <title>PlantDoc AI — Periksa Daun Tomat</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23e8f5ea'/%3E%3Cpath d='M26 5C14 5 6 10 6 20a7 7 0 0 0 7 7c10 0 15-8 13-22Z' fill='none' stroke='%232f8f5b' stroke-width='2'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="app">
+    <header class="masthead">
+      <span class="logo-mark" aria-hidden="true">
+        <svg viewBox="0 0 32 32" fill="none"><path d="M26 5C14 5 6 10 6 20a7 7 0 0 0 7 7c10 0 15-8 13-22Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 25c3-7 8-11 14-14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </span>
+      <span class="logo-name">PlantDoc AI</span>
+      <span class="badge">DEMO</span>
+    </header>
+
+    <section class="intro">
+      <h1>Periksa daun tomat dari foto.</h1>
+      <p>Unggah gambar daun, lalu lihat kondisi dan tingkat keyakinannya.</p>
+    </section>
+
+    <section class="analyzer" aria-label="Analisis daun">
+      <div class="drop-zone" id="dropZone" role="button" tabindex="0" aria-label="Pilih atau lepas foto daun di sini">
+        <input type="file" id="fileInput" accept="image/*" hidden>
+        <div class="drop-placeholder" id="dropPlaceholder">
+          <span class="upload-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M12 16V4m0 0L8 8m4-4 4 4M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+          <strong>Tarik foto ke sini atau <u>pilih berkas</u></strong>
+          <small>JPG, PNG, atau WEBP · maksimal 10 MB</small>
+        </div>
+        <div class="preview" id="previewWrap" hidden>
+          <img id="previewImage" src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" alt="Pratinjau foto daun yang dipilih">
+          <div class="preview-meta">
+            <span id="fileName"></span>
+            <span id="fileSize"></span>
+            <button type="button" id="changePhoto">Ganti</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="samples">
+        <span>Coba contoh:</span>
+        <button type="button" data-sample="healthy">Sehat</button>
+        <button type="button" data-sample="early">Early blight</button>
+        <button type="button" data-sample="late">Late blight</button>
+        <button type="button" data-sample="mold">Leaf mold</button>
+      </div>
+
+      <button type="button" class="primary" id="analyzeBtn" disabled>Analisis daun</button>
+      <p class="privacy">Foto diproses di browser, tidak dikirim ke server.</p>
+
+      <div class="state" id="resultEmpty">Hasil akan muncul di sini setelah analisis.</div>
+
+      <div class="state loading" id="resultLoading" hidden>
+        <span class="spinner" aria-hidden="true"></span>
+        Menganalisis…
+      </div>
+
+      <div class="result" id="resultContent" hidden aria-live="polite">
+        <p class="meta">HASIL</p>
+        <div class="result-head">
+          <h2 id="resultName"></h2>
+          <strong id="confidenceValue"></strong>
+        </div>
+        <p class="sub" id="resultLatin"></p>
+        <p id="resultDesc"></p>
+        <p class="advice" id="resultAdvice"></p>
+
+        <details class="breakdown">
+          <summary>Skor keempat kelas</summary>
+          <div id="scoreList"></div>
+        </details>
+
+        <p class="demo-note" id="demoNote">Mode demo — memakai heuristik warna di browser, bukan model terlatih.</p>
+        <button type="button" class="reset" id="resetBtn">Foto lain</button>
+      </div>
+    </section>
+
+    <footer>Ghazalah Ramadhan Daffa Firjatullah · Dataset PlantVillage, 4 kelas</footer>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
