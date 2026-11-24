@@ -9,3 +9,6 @@ kaggle.json
 *.keras
 *.tflite
 *.onnx
+artifacts/
+.env
+*.log

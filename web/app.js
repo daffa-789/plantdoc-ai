@@ -5,7 +5,7 @@
    Fractions (0-1) and percentages (0-100) are both accepted.
    Empty endpoint = labelled color-heuristic demo in the browser.
 */
-const MODEL_ENDPOINT = "";
+const MODEL_ENDPOINT = "http://127.0.0.1:8000/predict";
 const PLACEHOLDER = "data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=";
 
 const CLASSES = {

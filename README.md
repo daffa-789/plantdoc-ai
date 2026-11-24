@@ -1,18 +1,21 @@
 # PlantDoc AI
 
-Proyek klasifikasi penyakit daun tomat berbasis transfer learning MobileNetV2.
+Local PlantVillage tomato leaf classifier built with MobileNetV2 transfer learning.
 
-## Isi proyek
+## Structure
 
-- `plantdoc_mobilenetv2_colab.ipynb`: notebook pelatihan di Google Colab
-- `plantdoc-web/`: aplikasi web inferensi PlantDoc
-- `rencana_proyek_ai.md`: rencana dan dokumentasi pengembangan AI
-- `Ghazalah R Daffa F-PlantDoc AI.pptx`: presentasi proyek
+- `backend/` - FastAPI inference server
+- `web/` - static responsive web interface
+- `artifacts/models/` - trained `model.tflite`, `best.keras`, and `labels.json`
+- `notebooks/` - Colab training notebook
+- `docs/` - project documentation and presentation sources
+- `slides/` - rendered presentation assets
 
-## Notebook Colab
+## Run locally
 
-1. Setel runtime Colab ke GPU T4.
-2. Tambahkan secret `KAGGLE_USERNAME` dan `KAGGLE_KEY`.
-3. Jalankan seluruh sel dari atas ke bawah.
+```powershell
+py -m pip install -r requirements.txt
+py -m uvicorn backend.app:app --reload --host 127.0.0.1 --port 8000
+```
 
-Notebook hanya menggunakan dataset publik PlantVillage berlisensi CC0.
+Open `http://127.0.0.1:8000`.
