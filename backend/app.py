@@ -54,7 +54,7 @@ DISPLAY_NAMES = {
 
 
 def predict_image(image: Image.Image) -> tuple[dict | None, dict | None]:
-    image = image.convert("RGB").resize((INPUT_WIDTH, INPUT_HEIGHT))
+    image = image.resize((INPUT_WIDTH, INPUT_HEIGHT))
     pixels = np.asarray(image, dtype=np.float32)
 
     green_mask = (
