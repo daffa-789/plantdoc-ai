@@ -1,0 +1,14 @@
+{
+  "classes": [
+    "early",
+    "healthy",
+    "late",
+    "mold"
+  ],
+  "web_keys": [
+    "early",
+    "healthy",
+    "late",
+    "mold"
+  ]
+}
