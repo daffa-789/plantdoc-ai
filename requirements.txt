@@ -1,4 +1,4 @@
 python-fasthtml>=0.12
 Pillow>=11
 numpy>=2
-tensorflow>=2.18
+ai-edge-litert==2.4.0

@@ -1,6 +1,6 @@
 # PlantDoc AI
 
-Local PlantVillage tomato leaf classifier built with MobileNetV2 transfer learning and FastHTML. The interface is composed from Python FastTags and server-rendered routes; the project does not define separate HTML, CSS, or JavaScript frontend files.
+Local PlantVillage tomato leaf classifier built with MobileNetV2 transfer learning and FastHTML. The interface is composed from Python FastTags and server-rendered routes; the project does not define separate HTML, CSS, or JavaScript frontend files. The stylesheet is embedded in Python, so the web interface loads without CDN assets.
 
 ## Structure
 
