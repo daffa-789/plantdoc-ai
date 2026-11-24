@@ -1,32 +1,26 @@
-from pathlib import Path
+import asyncio
+from io import BytesIO
 import json
+from pathlib import Path
+import threading
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from fastapi.staticfiles import StaticFiles
-from PIL import Image
 import numpy as np
-
-try:
-    import tensorflow as tf
-except ImportError as exc:
-    raise RuntimeError("TensorFlow is required for this backend") from exc
+from fasthtml.common import *
+from PIL import Image, UnidentifiedImageError
+from starlette.datastructures import UploadFile
+from starlette.requests import Request
+from starlette.responses import JSONResponse
+import tensorflow as tf
 
 
 ROOT = Path(__file__).resolve().parents[1]
 ARTIFACTS_DIR = ROOT / "artifacts" / "models"
 TFLITE_PATH = ARTIFACTS_DIR / "model.tflite"
 LABELS_PATH = ARTIFACTS_DIR / "labels.json"
-WEB_DIR = ROOT / "web"
-
-if not TFLITE_PATH.exists():
-    raise RuntimeError(f"TFLite model not found: {TFLITE_PATH}")
-if not LABELS_PATH.exists():
-    raise RuntimeError(f"Labels file not found: {LABELS_PATH}")
 
 labels = json.loads(LABELS_PATH.read_text(encoding="utf-8"))
 WEB_KEYS = labels["web_keys"]
+CONFIDENCE_THRESHOLD = 0.62
 
 interpreter = tf.lite.Interpreter(model_path=str(TFLITE_PATH))
 interpreter.allocate_tensors()
@@ -36,47 +30,219 @@ INPUT_INDEX = input_details[0]["index"]
 OUTPUT_INDEX = output_details[0]["index"]
 INPUT_HEIGHT = input_details[0]["shape"][1]
 INPUT_WIDTH = input_details[0]["shape"][2]
+interpreter_lock = threading.Lock()
 
-app = FastAPI(title="PlantDoc AI", version="1.0")
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost", "http://127.0.0.1", "null"],
-    allow_credentials=False,
-    allow_methods=["GET", "POST"],
-    allow_headers=["*"],
+app, rt = fast_app(
+    pico=True,
+    htmx=False,
+    surreal=False,
+    htmlkw={"data-theme": "light"},
 )
 
+CLASS_NAMES = {
+    "healthy": "Tomato — Healthy",
+    "early": "Tomato — Early Blight",
+    "late": "Tomato — Late Blight",
+    "mold": "Tomato — Leaf Mold",
+}
+DISPLAY_NAMES = {
+    "healthy": "Daun sehat",
+    "early": "Hawar awal",
+    "late": "Hawar lanjut",
+    "mold": "Kapang daun",
+}
 
-@app.get("/health")
-def health():
-    return {"status": "ok", "model": "model.tflite", "classes": WEB_KEYS}
 
+def predict_image(image: Image.Image) -> tuple[dict | None, dict | None]:
+    image = image.convert("RGB").resize((INPUT_WIDTH, INPUT_HEIGHT))
+    pixels = np.asarray(image, dtype=np.float32)
 
-@app.post("/predict")
-async def predict(file: UploadFile = File(...)):
-    if not file.content_type or not file.content_type.startswith("image/"):
-        raise HTTPException(status_code=415, detail="File must be an image")
+    green_mask = (
+        (pixels[:, :, 1] > pixels[:, :, 0] * 1.08)
+        & (pixels[:, :, 1] > pixels[:, :, 2] * 1.08)
+        & (pixels[:, :, 1] > 55)
+    )
+    green_ratio = float(np.mean(green_mask))
+    if green_ratio < 0.08:
+        return None, {
+            "code": "NOT_A_LEAF",
+            "message": "Gambar tidak terdeteksi sebagai daun tanaman.",
+        }
 
-    try:
-        image = Image.open(file.file).convert("RGB")
-        image = image.resize((INPUT_WIDTH, INPUT_HEIGHT))
-        pixels = np.asarray(image, dtype=np.float32)
-        pixels = np.expand_dims(pixels, axis=0)
-        interpreter.set_tensor(INPUT_INDEX, pixels)
+    with interpreter_lock:
+        interpreter.set_tensor(INPUT_INDEX, np.expand_dims(pixels, axis=0))
         interpreter.invoke()
         probabilities = interpreter.get_tensor(OUTPUT_INDEX)[0]
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"Unable to process image: {exc}") from exc
-
-    if len(probabilities) != len(WEB_KEYS):
-        raise HTTPException(status_code=500, detail="Model output size does not match labels")
 
     predictions = {
         key: float(probability)
         for key, probability in zip(WEB_KEYS, probabilities)
     }
-    return JSONResponse({"predictions": predictions})
+    top_index = int(np.argmax(probabilities))
+    top_key = WEB_KEYS[top_index]
+    confidence = float(probabilities[top_index])
+    return {
+        "top_key": top_key,
+        "top_name": CLASS_NAMES[top_key],
+        "confidence": confidence * 100,
+        "uncertain": confidence < CONFIDENCE_THRESHOLD,
+        "predictions": predictions,
+    }, None
 
 
-if WEB_DIR.exists():
-    app.mount("/", StaticFiles(directory=WEB_DIR, html=True), name="web")
+def read_image(image_bytes: bytes) -> Image.Image:
+    return Image.open(BytesIO(image_bytes)).convert("RGB")
+
+
+def result_section(result: dict | None, error: str | None):
+    if error:
+        return Article(P(error, role="alert"))
+    if result is None:
+        return Div()
+
+    confidence = result["confidence"]
+    score_items = [
+        Li(
+            Div(Strong(DISPLAY_NAMES.get(key, key)), P(f"{score:.1%}"), cls="grid"),
+            Progress(value=score, max=1),
+        )
+        for key, score in result["predictions"].items()
+    ]
+    return Article(
+        H2(DISPLAY_NAMES.get(result["top_key"], result["top_name"])),
+        P(result["top_name"]),
+        P(
+            "Perlu foto lebih jelas"
+            if result["uncertain"]
+            else "Prediksi model"
+        ),
+        P(Strong("Skor prediksi"), f" {confidence:.1f}%"),
+        Progress(value=confidence / 100, max=1),
+        P(
+            "Skor model masih rendah. Coba foto daun yang lebih fokus dengan "
+            "pencahayaan merata."
+            if result["uncertain"]
+            else "Prediksi ini merupakan informasi awal, bukan diagnosis pasti "
+            "kondisi tanaman."
+        ),
+        Details(Summary("Lihat skor semua kelas"), Ul(*score_items)),
+    )
+
+
+def page(result: dict | None = None, error: str | None = None):
+    return (
+        Title("PlantDoc AI — Pemeriksaan Daun Tomat"),
+        Meta(name="viewport", content="width=device-width, initial-scale=1"),
+        Header(
+            Div(
+                Nav(A(Strong("PlantDoc AI"), href="/"), P("Model berjalan lokal")),
+                cls="container",
+            )
+        ),
+        Main(
+            Section(
+                H1("Kenali kondisi daun, mulai dari fotonya."),
+                P(
+                    "Unggah foto daun tomat untuk melihat prediksi model dan skor "
+                    "dari empat kelas yang dikenali."
+                ),
+            ),
+            Div(
+                Article(
+                    H2("Mulai pemeriksaan"),
+                    P("Pilih satu foto daun tomat yang terlihat jelas."),
+                    Form(
+                        Label(
+                            "Foto daun",
+                            Input(
+                                type="file",
+                                name="file",
+                                accept=".jpg,.jpeg,.png,.webp",
+                                required=True,
+                            ),
+                        ),
+                        Button("Analisis foto", type="submit"),
+                        action="/analyze",
+                        method="post",
+                        enctype="multipart/form-data",
+                    ),
+                    P("Foto diproses oleh model lokal dan tidak disimpan aplikasi."),
+                    result_section(result, error),
+                ),
+                Aside(
+                    H2("Agar foto lebih mudah dibaca"),
+                    P(
+                        "Fokuskan kamera pada satu daun, pastikan permukaannya "
+                        "terlihat jelas, dan gunakan pencahayaan yang cukup."
+                    ),
+                    Hr(),
+                    H3("Empat kelas yang dikenali"),
+                    Ul(*(Li(name) for name in DISPLAY_NAMES.values())),
+                ),
+                cls="grid",
+            ),
+            P(
+                "Gunakan hasil sebagai informasi awal, bukan pengganti pemeriksaan "
+                "ahli tanaman."
+            ),
+            cls="container",
+            lang="id",
+        ),
+    )
+
+
+@rt("/", methods=["GET"])
+def home():
+    return page()
+
+
+@rt("/analyze", methods=["POST"])
+async def analyze(request: Request):
+    form = await request.form()
+    file = form.get("file")
+    if not isinstance(file, UploadFile):
+        return page(error="Pilih berkas gambar terlebih dahulu.")
+
+    try:
+        image = read_image(await file.read())
+    except (UnidentifiedImageError, OSError, ValueError):
+        return page(error="Gambar tidak dapat dibaca. Pilih JPG, PNG, atau WEBP.")
+
+    result, error = await asyncio.to_thread(predict_image, image)
+    if error:
+        return page(error=error["message"])
+    return page(result=result)
+
+
+@rt("/health", methods=["GET"])
+def health():
+    return JSONResponse(
+        {"status": "ok", "model": "model.tflite", "classes": WEB_KEYS}
+    )
+
+
+@rt("/predict", methods=["POST"])
+async def predict_api(request: Request):
+    form = await request.form()
+    file = form.get("file")
+    if not isinstance(file, UploadFile):
+        return JSONResponse(status_code=400, content={"error": "File gambar diperlukan"})
+
+    try:
+        image = read_image(await file.read())
+    except (UnidentifiedImageError, OSError, ValueError):
+        return JSONResponse(status_code=400, content={"error": "Gambar tidak dapat dibaca"})
+
+    result, error = await asyncio.to_thread(predict_image, image)
+    if error:
+        return JSONResponse(status_code=422, content={"error": error})
+    return JSONResponse({"result": result})
+
+
+if __name__ == "__main__":
+    serve(
+        appname="backend.app",
+        host="127.0.0.1",
+        port=5000,
+        reload=False,
+    )

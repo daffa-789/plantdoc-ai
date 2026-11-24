@@ -1,11 +1,10 @@
 # PlantDoc AI
 
-Local PlantVillage tomato leaf classifier built with MobileNetV2 transfer learning.
+Local PlantVillage tomato leaf classifier built with MobileNetV2 transfer learning and FastHTML. The interface is composed from Python FastTags and server-rendered routes; the project does not define separate HTML, CSS, or JavaScript frontend files.
 
 ## Structure
 
-- `backend/` - FastAPI inference server
-- `web/` - static responsive web interface
+- `backend/` - FastHTML application and model inference
 - `artifacts/models/` - trained `model.tflite`, `best.keras`, and `labels.json`
 - `notebooks/` - Colab training notebook
 - `docs/` - project documentation and presentation sources
@@ -13,9 +12,11 @@ Local PlantVillage tomato leaf classifier built with MobileNetV2 transfer learni
 
 ## Run locally
 
+Install dependencies into the selected global Python installation:
+
 ```powershell
-py -m pip install -r requirements.txt
-py -m uvicorn backend.app:app --reload --host 127.0.0.1 --port 8000
+python -m pip install -r requirements.txt
+python -m backend.app
 ```
 
-Open `http://127.0.0.1:8000`.
+Open `http://127.0.0.1:5000`.
