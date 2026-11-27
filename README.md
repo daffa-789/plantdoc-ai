@@ -14,9 +14,13 @@ Local PlantVillage tomato leaf classifier built with MobileNetV2 transfer learni
 
 ## Run locally
 
-Install dependencies into the selected global Python installation:
+Use Python 3.12 or 3.13 for the local FastHTML/LiteRT application. The Colab notebook enforces the same version range and installs TensorFlow's official CUDA extra when an NVIDIA GPU is available.
+
+Install dependencies into a virtual environment:
 
 ```powershell
+py -3.13 -m venv .venv
+.\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
 python main.py
 ```
